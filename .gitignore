@@ -22,7 +22,7 @@
 /Makefile.cyg
 /Makefile.vc
 /Makefile.lcc
-/MSVC
+
 /*.log
 /*.GID
 /local
@@ -123,7 +123,6 @@
 /windows/Makefile.cyg
 /windows/Makefile.vc
 /windows/Makefile.lcc
-/windows/MSVC
 /windows/DEVCPP
 /windows/VS2010
 /windows/VS2012

@@ -433,7 +433,6 @@ static void kexlist_handler(union control *ctrl, void *dlg,
 	    { "Diffie-Hellman group 14",	KEX_DHGROUP14 },
 	    { "Diffie-Hellman group exchange",	KEX_DHGEX },
 	    { "RSA-based key exchange", 	KEX_RSA },
-            { "ECDH key exchange",              KEX_ECDH },
 	    { "-- warn below here --",		KEX_WARN }
 	};
 
@@ -573,7 +572,7 @@ static void sessionsaver_data_free(void *ssdv)
     sfree(ssd);
 }
 
-/* 
+/*
  * Helper function to load the session selected in the list box, if
  * any, as this is done in more than one place below. Returns 0 for
  * failure.
@@ -605,135 +604,154 @@ static void sessionsaver_handler(union control *ctrl, void *dlg,
 {
     Conf *conf = (Conf *)data;
     struct sessionsaver_data *ssd =
-	(struct sessionsaver_data *)ctrl->generic.context.p;
+    (struct sessionsaver_data *)ctrl->generic.context.p;
 
-    if (event == EVENT_REFRESH) {
-	if (ctrl == ssd->editbox) {
-	    dlg_editbox_set(ctrl, dlg, ssd->savedsession);
-	} else if (ctrl == ssd->listbox) {
-	    int i;
-	    dlg_update_start(ctrl, dlg);
-	    dlg_listbox_clear(ctrl, dlg);
-	    for (i = 0; i < ssd->sesslist.nsessions; i++)
-		dlg_listbox_add(ctrl, dlg, ssd->sesslist.sessions[i]);
-	    dlg_update_done(ctrl, dlg);
-	}
-    } else if (event == EVENT_VALCHANGE) {
-        int top, bottom, halfway, i;
-	if (ctrl == ssd->editbox) {
-            sfree(ssd->savedsession);
-            ssd->savedsession = dlg_editbox_get(ctrl, dlg);
-	    top = ssd->sesslist.nsessions;
-	    bottom = -1;
-	    while (top-bottom > 1) {
-	        halfway = (top+bottom)/2;
-	        i = strcmp(ssd->savedsession, ssd->sesslist.sessions[halfway]);
-	        if (i <= 0 ) {
-		    top = halfway;
-	        } else {
-		    bottom = halfway;
-	        }
-	    }
-	    if (top == ssd->sesslist.nsessions) {
-	        top -= 1;
-	    }
-	    dlg_listbox_select(ssd->listbox, dlg, top);
-	}
-    } else if (event == EVENT_ACTION) {
-	int mbl = FALSE;
-	if (!ssd->midsession &&
-	    (ctrl == ssd->listbox ||
-	     (ssd->loadbutton && ctrl == ssd->loadbutton))) {
-	    /*
-	     * The user has double-clicked a session, or hit Load.
-	     * We must load the selected session, and then
-	     * terminate the configuration dialog _if_ there was a
-	     * double-click on the list box _and_ that session
-	     * contains a hostname.
-	     */
-	    if (load_selected_session(ssd, dlg, conf, &mbl) &&
-		(mbl && ctrl == ssd->listbox && conf_launchable(conf))) {
-		dlg_end(dlg, 1);       /* it's all over, and succeeded */
-	    }
-	} else if (ctrl == ssd->savebutton) {
-	    int isdef = !strcmp(ssd->savedsession, "Default Settings");
-	    if (!ssd->savedsession[0]) {
-		int i = dlg_listbox_index(ssd->listbox, dlg);
-		if (i < 0) {
-		    dlg_beep(dlg);
-		    return;
+    if (event == EVENT_REFRESH)
+    {
+        if (ctrl == ssd->editbox)
+        {
+            dlg_editbox_set(ctrl, dlg, ssd->savedsession);
+        }
+        else if (ctrl == ssd->listbox)
+        {
+            int i;
+            dlg_update_start(ctrl, dlg);
+            dlg_listbox_clear(ctrl, dlg);
+            for (i = 0; i < ssd->sesslist.nsessions; i++)
+                dlg_listbox_add(ctrl, dlg, ssd->sesslist.sessions[i]);
+            dlg_update_done(ctrl, dlg);
+        }
+    }
+    else if(event == EVENT_SELCHANGE)
+	{
+		if (ctrl == ssd->listbox){
+			int mbl = FALSE;
+			load_selected_session(ssd, dlg, conf, &mbl);
 		}
-		isdef = !strcmp(ssd->sesslist.sessions[i], "Default Settings");
+	}
+    else if (event == EVENT_VALCHANGE)
+    {
+
+    }
+    else if (event == EVENT_ACTION)
+    {
+        int mbl = FALSE;
+        if (!ssd->midsession &&
+                (ctrl == ssd->listbox ||
+                 (ssd->loadbutton && ctrl == ssd->loadbutton)))
+        {
+            /*
+             * The user has double-clicked a session, or hit Load.
+             * We must load the selected session, and then
+             * terminate the configuration dialog _if_ there was a
+             * double-click on the list box _and_ that session
+             * contains a hostname.
+             */
+            if (load_selected_session(ssd, dlg, conf, &mbl) &&
+                    (mbl && ctrl == ssd->listbox && conf_launchable(conf)))
+            {
+                dlg_end(dlg, 1);       /* it's all over, and succeeded */
+            }
+        }
+        else if (ctrl == ssd->savebutton)
+        {
+            int isdef = !strcmp(ssd->savedsession, "Default Settings");
+            if (!ssd->savedsession[0])
+            {
+                int i = dlg_listbox_index(ssd->listbox, dlg);
+                if (i < 0)
+                {
+                    dlg_beep(dlg);
+                    return;
+                }
+                isdef = !strcmp(ssd->sesslist.sessions[i], "Default Settings");
                 sfree(ssd->savedsession);
                 ssd->savedsession = dupstr(isdef ? "" :
                                            ssd->sesslist.sessions[i]);
-	    }
+            }
             {
                 char *errmsg = save_settings(ssd->savedsession, conf);
-                if (errmsg) {
+                if (errmsg)
+                {
                     dlg_error_msg(dlg, errmsg);
                     sfree(errmsg);
                 }
             }
-	    get_sesslist(&ssd->sesslist, FALSE);
-	    get_sesslist(&ssd->sesslist, TRUE);
-	    dlg_refresh(ssd->editbox, dlg);
-	    dlg_refresh(ssd->listbox, dlg);
-	} else if (!ssd->midsession &&
-		   ssd->delbutton && ctrl == ssd->delbutton) {
-	    int i = dlg_listbox_index(ssd->listbox, dlg);
-	    if (i <= 0) {
-		dlg_beep(dlg);
-	    } else {
-		del_settings(ssd->sesslist.sessions[i]);
-		get_sesslist(&ssd->sesslist, FALSE);
-		get_sesslist(&ssd->sesslist, TRUE);
-		dlg_refresh(ssd->listbox, dlg);
-	    }
-	} else if (ctrl == ssd->okbutton) {
-            if (ssd->midsession) {
+            get_sesslist(&ssd->sesslist, FALSE);
+            get_sesslist(&ssd->sesslist, TRUE);
+            dlg_refresh(ssd->editbox, dlg);
+            dlg_refresh(ssd->listbox, dlg);
+        }
+        else if (!ssd->midsession &&
+                 ssd->delbutton && ctrl == ssd->delbutton)
+        {
+            int i = dlg_listbox_index(ssd->listbox, dlg);
+            if (i <= 0)
+            {
+                dlg_beep(dlg);
+            }
+            else
+            {
+                del_settings(ssd->sesslist.sessions[i]);
+                get_sesslist(&ssd->sesslist, FALSE);
+                get_sesslist(&ssd->sesslist, TRUE);
+                dlg_refresh(ssd->listbox, dlg);
+            }
+        }
+        else if (ctrl == ssd->okbutton)
+        {
+            if (ssd->midsession)
+            {
                 /* In a mid-session Change Settings, Apply is always OK. */
-		dlg_end(dlg, 1);
+                dlg_end(dlg, 1);
                 return;
             }
-	    /*
-	     * Annoying special case. If the `Open' button is
-	     * pressed while no host name is currently set, _and_
-	     * the session list previously had the focus, _and_
-	     * there was a session selected in that which had a
-	     * valid host name in it, then load it and go.
-	     */
-	    if (dlg_last_focused(ctrl, dlg) == ssd->listbox &&
-		!conf_launchable(conf)) {
-		Conf *conf2 = conf_new();
-		int mbl = FALSE;
-		if (!load_selected_session(ssd, dlg, conf2, &mbl)) {
-		    dlg_beep(dlg);
-		    conf_free(conf2);
-		    return;
-		}
-		/* If at this point we have a valid session, go! */
-		if (mbl && conf_launchable(conf2)) {
-		    conf_copy_into(conf, conf2);
-		    dlg_end(dlg, 1);
-		} else
-		    dlg_beep(dlg);
+            /*
+             * Annoying special case. If the `Open' button is
+             * pressed while no host name is currently set, _and_
+             * the session list previously had the focus, _and_
+             * there was a session selected in that which had a
+             * valid host name in it, then load it and go.
+             */
+            if (dlg_last_focused(ctrl, dlg) == ssd->listbox &&
+                    !conf_launchable(conf))
+            {
+                Conf *conf2 = conf_new();
+                int mbl = FALSE;
+                if (!load_selected_session(ssd, dlg, conf2, &mbl))
+                {
+                    dlg_beep(dlg);
+                    conf_free(conf2);
+                    return;
+                }
+                /* If at this point we have a valid session, go! */
+                if (mbl && conf_launchable(conf2))
+                {
+                    conf_copy_into(conf, conf2);
+                    dlg_end(dlg, 1);
+                }
+                else
+                    dlg_beep(dlg);
 
-		conf_free(conf2);
+                conf_free(conf2);
                 return;
-	    }
+            }
 
-	    /*
-	     * Otherwise, do the normal thing: if we have a valid
-	     * session, get going.
-	     */
-	    if (conf_launchable(conf)) {
-		dlg_end(dlg, 1);
-	    } else
-		dlg_beep(dlg);
-	} else if (ctrl == ssd->cancelbutton) {
-	    dlg_end(dlg, 0);
-	}
+            /*
+             * Otherwise, do the normal thing: if we have a valid
+             * session, get going.
+             */
+            if (conf_launchable(conf))
+            {
+                dlg_end(dlg, 1);
+            }
+            else
+                dlg_beep(dlg);
+        }
+        else if (ctrl == ssd->cancelbutton)
+        {
+            dlg_end(dlg, 0);
+        }
     }
 }
 
@@ -1797,7 +1815,7 @@ void setup_config_box(struct controlbox *b, int midsession,
      * The Window/Selection panel.
      */
     ctrl_settitle(b, "Window/Selection", "Options controlling copy and paste");
-	
+
     s = ctrl_getset(b, "Window/Selection", "mouse",
 		    "Control use of mouse");
     ctrl_checkbox(s, "Shift overrides application's use of mouse", 'p',
@@ -2390,7 +2408,7 @@ void setup_config_box(struct controlbox *b, int midsession,
 		 * absolutely no consensus on where to keep the
 		 * libraries, there'll need to be a flag alongside
 		 * ngsslibs to control whether the file selector is
-		 * displayed. 
+		 * displayed.
 		 */
 
 		ctrl_filesel(s, "User-supplied GSSAPI library path:", 's',
